@@ -1,0 +1,33 @@
+[package]
+name = "palimpsest-train"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "palimpsest-train"
+path = "src/main.rs"
+
+[dependencies]
+palimpsest-core = { workspace = true }
+palimpsest-data = { workspace = true }
+palimpsest-drafter = { workspace = true }
+palimpsest-router = { workspace = true }
+palimpsest-editor = { workspace = true }
+palimpsest-critic = { workspace = true }
+burn = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+anyhow = { workspace = true }
+
+[features]
+# Backend selection. Exactly one should be active; ndarray is the CPU
+# dev/test default per the project plan. GPU backends are declared but
+# unexercised so far — correctness on CPU first.
+default = ["ndarray"]
+ndarray = ["burn/ndarray"]
+wgpu = ["burn/wgpu"]
+tch = ["burn/tch"]

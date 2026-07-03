@@ -1,0 +1,47 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/palimpsest-core",
+    "crates/palimpsest-data",
+    "crates/palimpsest-drafter",
+    "crates/palimpsest-router",
+    "crates/palimpsest-editor",
+    "crates/palimpsest-critic",
+    "crates/palimpsest-train",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/turtle170/palimpsest"
+
+[workspace.dependencies]
+# Burn is kept backend-agnostic here: model crates are generic over `B: Backend`.
+# Concrete backends (ndarray / wgpu / tch) are selected via feature flags in
+# palimpsest-train (and as dev-dependencies for crate-local tests).
+burn = { version = "0.21", default-features = false, features = [
+    "std",
+    "autodiff",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand = "0.9"
+anyhow = "1"
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+
+palimpsest-core = { path = "crates/palimpsest-core" }
+palimpsest-data = { path = "crates/palimpsest-data" }
+palimpsest-drafter = { path = "crates/palimpsest-drafter" }
+palimpsest-router = { path = "crates/palimpsest-router" }
+palimpsest-editor = { path = "crates/palimpsest-editor" }
+palimpsest-critic = { path = "crates/palimpsest-critic" }
+
+[profile.dev]
+# Tensor code is unusable at opt-level 0; keep debug builds fast enough to run
+# toy training loops directly.
+opt-level = 2
+
+[profile.dev.package."*"]
+opt-level = 3
