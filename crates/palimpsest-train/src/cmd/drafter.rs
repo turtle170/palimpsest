@@ -15,7 +15,6 @@ use burn::tensor::ElementConversion;
 use clap::Parser;
 use palimpsest_core::tensor_util::mean_nll;
 use palimpsest_core::tokenizer::Tokenizer;
-use palimpsest_data::batch::BatchIndexer;
 use palimpsest_data::{KvTaskConfig, generate_examples};
 use palimpsest_drafter::DrafterConfig;
 
@@ -30,8 +29,6 @@ pub struct Args {
     pub batch_size: usize,
     #[arg(long, default_value_t = 1e-3)]
     pub lr: f64,
-    #[arg(long, default_value_t = 4096)]
-    pub train_examples: usize,
     #[arg(long, default_value_t = 512)]
     pub valid_examples: usize,
     #[arg(long, default_value = "artifacts/drafter")]
@@ -46,15 +43,16 @@ pub fn run(args: Args) -> anyhow::Result<()> {
     let task = KvTaskConfig::default();
     let vocab = task.vocab();
 
-    // Different seeds for train/valid; see kv_task.rs on split contamination.
-    let train_set = generate_examples(&task, args.train_examples, 1);
+    // Training streams FRESH examples every step (synthetic data is free):
+    // a fixed small train set memorizes instead of learning the recall
+    // circuit — observed as rising valid loss with ~36% answer accuracy.
+    // Valid set stays fixed (seed 2); train batch seeds are offset far away.
     let valid_set = generate_examples(&task, args.valid_examples, 2);
     let answer_pos = task.answer_pos();
 
     let model_config = DrafterConfig::new(vocab.vocab_size()).with_max_seq_len(task.seq_len());
     let mut model = model_config.init::<Train>(&device);
     let mut optim = AdamWConfig::new().init();
-    let mut indexer = BatchIndexer::new(train_set.len(), args.batch_size, 3);
 
     println!(
         "Training Drafter: {} steps, batch {}, lr {}, vocab {}, seq_len {}",
@@ -66,8 +64,9 @@ pub fn run(args: Args) -> anyhow::Result<()> {
     );
 
     for step in 1..=args.steps {
-        let indices = indexer.next_batch().to_vec();
-        let batch = batch_tokens::<Train>(&train_set, &indices, &device);
+        let train_batch = generate_examples(&task, args.batch_size, 1_000_000 + step as u64);
+        let indices: Vec<usize> = (0..train_batch.len()).collect();
+        let batch = batch_tokens::<Train>(&train_batch, &indices, &device);
         let (inputs, targets) = batch.autoregressive_views();
         let logits = model.forward(inputs);
         let loss = mean_nll(logits, targets);
